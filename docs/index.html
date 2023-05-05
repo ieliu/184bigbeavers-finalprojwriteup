@@ -21,7 +21,8 @@
             color: #121212;
         }
     </style>
-    <title>CS 184 Path Tracer</title>
+    <title>CS184 Big Beavers Final Proj
+    </title>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
 
@@ -46,7 +47,7 @@
 <h2 align="middle">Big Beavers: Jojo Chen, Michelle Chen, Isabelle Liu, and Nicholas Cheng</h2>
 
 <!-- Add Website URL -->
-<h2 align="middle">Website URL: <a href="https://ieliu.github.io/184proj4-clothsim-writeup/">https://ieliu.github.io/184proj4-clothsim-writeup/</a></h2>
+<h2 align="middle">Website URL: <a href="https://ieliu.github.io/184bigbeavers-finalprojwriteup/">https://ieliu.github.io/184bigbeavers-finalprojwriteup/</a></h2>
 
 
 
@@ -83,50 +84,89 @@
 
 <!--<div>-->
 
-<h2 align="middle">Overview</h2>
-<h3> Give a high-level overview of what you implemented in this project. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the project. </h3>
-<p> In this project, we were able to explore and create a simulation of cloth in multiple settings (such as falling, being pinned, or hanging from a sphere). We began with building a system made up of point masses and springs to divide the cloth up into even-sized pieces. Next, we used numerical integration to model how our cloth would move at any point in time; one thing we had to consider were forces applied to our cloth like gravity and the spring states of each point. Then, we had to handle collisions of our cloth with other things like spheres and planes; we did so by correcting any collisions between the two objects and making it so that our cloth would float above other objects rather than just going through the–this brought back old concepts like ray intersections! We continued with collisions by handling the cloth colliding into itself, but instead of correcting collisions with other objects, we corrected with the point masses within the cloth; in order to avoid inefficiencies, we implemented spatial hashing that would allow us to “repulse” any self-collisions. Finally, we implemented shaders that allowed us to apply texture and lighting to our cloth! We linked vertex and fragment shaders which deal with the vertex geometry and rendering/coloring, respectively.  </p>
+<h2 align="middle">Abstract</h2>
+<h3> A paragraph summary of the entire project. </h3>
+<p>
+    In this project, we explored non-photorealistic rendering to create a tool for tattoo artists to easily generate designs in different tattoo styles. Our inspiration for this project came from the show Ink Masters, which our team members are all a fan of. On the show, we saw how difficult it was for tattoo artists to create art in many different art styles to please their clients. We hoped that our tool could help them easily create stencils in varying styles. By altering how light is rendered in a typical photorealistic manner we have learned in class, we created line art, stick & poke, American traditional, and chrome tattoo style renderings. 
+</p>
 <br>
 
-<h2 align="middle">Part 1: Masses and springs (20 Points)</h2>
+<h2 align="middle">Technical approach</h2>
 <!-- Walk through the ray generation and primitive intersection parts of the rendering pipeline.
 Explain the triangle intersection algorithm you implemented in your own words.
 Show images with normal shading for a few small .dae files. -->
 
 <h3>
-    Take some screenshots of scene/pinned2.json from a viewing angle where you can clearly see the cloth wireframe to show the structure of your point masses and springs.
+    A 1-2 page summary of your technical approach, techniques used, algorithms implemented, etc. (use references to papers or other resources for further detail). Highlight how your approach varied from the references used (did you implement a subset, or did you change or enhance anything), the unique decisions you made and why.
 </h3>
+<h3>A description of problems encountered and how you tackled them.</h3>
+<h3>A description of lessons learned.</h3>
+
+<p align="middle"><b>Line Art Style</b></p>
+<p>To recreate line art, we needed to have lines emphasizing each of the curves and edges of our models. After researching multiple possible ways, we landed on using an edge detection filter as the simplest way to implement into our existing project 3 code. We decided to use the Sobel Edge Detection technique. Essentially how the filtering works is that we can create two kernel matrices that act as masks for detecting horizontal and vertical edges.  For our implementation, we created a helper function Raytraced_Renderer::is_edge that basically applied the Sobel operator to the pixel, and returned whether that pixel was on an edge or not. Then, we just modified our Raytraced_Renderer::raytrace_tile method to call our new helper function!</p>
 
 <div align="middle">
         <table style="width:100%">
             <tr align="center">
                 <td>
-                    <img src="images/pinned2.png" align="middle" width="500vw" />
-                    <figcaption>pinned2 zoomed out picture. </figcaption>
+                    <img src="images/sobelmatrices.png" align="middle" width="500vw" />
+                    <figcaption>G_x and G_y matrices</figcaption>
                 </td>
-                <td>
-                    <img src="images/pinned2closeup.png" align="middle" width="500vw" />
-                    <figcaption>pinned2 zoomed in picture. </figcaption>
-                </td>
-            </tr>
         </table>
 </div>
-
-<h3>
-    Show us what the wireframe looks like (1) without any shearing constraints,
-    (2) with only shearing constraints, and (3) with all constraints.
-</h3>
-
+<p>Each of the kernels are applied to the image, and we can then combine the outputs to find the absolute magnitude of the gradient at each point in our image. We calculate the gradient magnitude with |G| = sqrt(Gx + Gy). After we’ve calculated all of our gradients, we apply a threshold value that allows us to differentiate pixels that are part of an edge and those that are not. We played around with the value of the threshold a lot, seeing whichever would give us the best results and we found that a very high threshold would give us the best, precise edges. </p>
+<p>One big problem that we encountered was with our threshold value. At first, we didn’t realize that our implementation would only produce good results with a very high threshold value, so we were encountering very grainy results or even seeing 3 bunny outlines at some point. After increasing our threshold value, everything became a bit smoother and actually fit our bunny model. </p>
 <div align="middle">
     <table style="width:100%">
         <tr align="center">
             <td>
-                <img src="images/noshear.png" align="middle" width="500px" />
-                <figcaption>No shearing constraints</figcaption>
+                <img src="images/oopsiesoutline.png" align="middle" width="400vw" />
+                <figcaption>Our first outline attempt!</figcaption>
             </td>
+    </table>
+</div>
+
+<p>Another issue that we encountered is the way that the colors are stored in the data model of project 3, which is what we mainly built our project off of. Usually, colors are stored as rgb triplets, so we just assumed that we could find the proportion of a color intensity by dividing by a constant of 255, but because colors are actually stored as hexadecimals, we weren’t able to just divide like that. Instead, we just took it as the value, and altered our implementation to deal with a single numerical representation for the color. Usually Sobel is used with grayscale values, but since we were concerned that we wouldn’t be able to store the data back in the same format, we just kept it as the colors. Unfortunately, this means that our edge detection isn’t great for detecting colorful edges. </p>
+
+<p align="middle"><b>Stick and poke</b></p>
+<p>Stick and poke tattooing seeks to create an image with a collection of dots of varying density to mimic shading. Images are generally grayscale and may or may not have an outline. On a high level, to create this effect, we first determined a grayscale value for each pixel. Since the density of dots create the values in stick and poke tattoos, we mimicked the effect by coloring each pixel either black or white according to a probability generated by their grayscale value. Therefore, pixels with a lower grayscale value (closer to white) have a higher probability of getting filled in with white and vice versa.  </p>
+<p> More specifically, we altered the PathTracer::raytrace_pixel() function. After generating the average value of the samples taken, we took the average of the rgb values((r+g+b)/3). This generates a grayscale equivalent using the average method described here. If we set each of r, g, and b to this average value, we get a grayscale equivalent of our original color (rgb(avg_val, avg_val, avg_val)). </p>
+<p>Then, we want to decide whether to fill in the pixel with black or white based on this average value. Since the RGB values are between 0 and 1, we used the value directly as a probability. According to that probability, we generated random values to determine where the pixel would be colored white. For example, if our average value was 0.1, then the pixel would have a 10% chance of being colored white. We also added an offset of 0.035 (which we found works well via experimentation) which helped bring more white spots to the rendering, which stick and poke tends to have. Finally, we used update_pixel() to add the white or black color to our sampleBuffer. </p>
+<p>During the process, we experimented with a couple of other ways to achieve this effect that failed. We first tried to generalize each tile to one value and randomly color in pixels according to the corresponding probability in the RaytracedRenderer::raytrace_tile() function. However, the tiles were too large for the images to be legible since a lot of the details were abstracted away. We also tried to make these tiles smaller, but discovered that calculating probabilities based on each pixel produced the most legible results. We also tried to reveal more white parts by eliminating midtones and just making them white, but found that this created unpredictable results depending on the lighting of the original image. Adding an offset to our average worked out a lot better. </p>
+
+<p align="middle"><b>American Traditional </b></p>
+<p>American traditional tattoos try to use bold, thick outlines and stark contrast of solid black and a limited palette of bright colors (but mainly red, greens and yellows). There’s a tendency to simplify lighting, making the designs look more 2D. We can try to achieve this through seeking the closest color to red, green, and yellow through finding the euclidean distance of the colors in our PathTracer::raytrace_pixel() function. If we can “round” to the nearest color, we can try to replicate american traditional tattoo-esque designs</p>
+<div align="middle">
+    <table style="width:100%">
+        <tr align="center">
             <td>
-                <img src="images/onlyshear.png" align="middle" width="500px" />
-                <figcaption>Only shearing constraints</figcaption>
+                <img src="images/moreeuclidean.png" align="middle" width="400vw" />
+            </td>
+    </table>
+</div>
+<p>Since RGB Color space has three dimensions (R, G, B), its Euclidean Distance would be defined as the following:</p>
+<div align="middle">
+    <table style="width:100%">
+        <tr align="center">
+            <td>
+                <img src="images/euclidean.png" align="middle" width="400vw" />
+            </td>
+    </table>
+</div>
+<p>The RGB value coordinates we needed were mainly bold colors of red, green, yellow, and black</p>
+<p>We can further simplify the lighting, or seemingly simplify the lighting by setting the max ray depth to 1. This avoids the nuances outside of the direct lighting and provides a simple, almost “cartoonish” lighting through reduction of complexity in lighting.</p>
+<p>During our attempt to implement color rendering for a tattoo design, we encountered a few problems and learned some valuable lessons. One of the biggest challenges was navigating the source code of the existing implementation for color rendering within the large codebase. This required us to spend a lot of time understanding how the code worked and how we could modify it to achieve the desired effect. Another issue we encountered was having conflicts with other artistic tattoo styles when trying to achieve a smooth integration. We had to carefully consider the color palette and ensure that it was compatible with the other styles. Additionally, we noticed that the coloring across the image was very grainy and didn't look as smooth as we had intended. To solve this problem, we decided to first grayscale the image to construct much smoother transitions. This helped us achieve the desired effect and create a more polished final design. Overall, this project taught us the importance of carefully considering different factors when implementing color rendering for tattoo designs, such as the color palette, integration with other styles, and image quality.</p>
+
+<p align="middle"><b>Chrome</b></p>
+<p>To get the chrome effect, we kept it simple and just overlaid our outline over our rendering for the microfacet portion of project 3-2. </p>
+
+<h2 align="middle">Results</h2>
+<div align="middle">
+    <table style="width:100%">
+        <tr align="center">
+            <td align="center">
+                <img src="images/outlinebunny.png" align="middle" width="500vw" />
+                <figcaption>Line art style bunny</figcaption>
             </td>
         </tr>
     </table>
@@ -135,343 +175,74 @@ Show images with normal shading for a few small .dae files. -->
     <table style="width:100%">
         <tr align="center">
             <td>
-                <img src="images/all3.png" align="middle" width="500vw" />
-                <figcaption>All constraints</figcaption>
+                <img src="images/stickandpokebun.png" align="middle" width="400vw" />
+                <figcaption>Stick and poke style bunny</figcaption>
+            </td>
+            <td>
+                <img src="images/stickandpokespheres.png" align="middle" width="400vw" />
+                <figcaption>Stick and poke style spheres</figcaption>
             </td>
         </tr>
     </table>
 </div>
-
-<h2 align="middle">Part 2: Simulation via numerical integration (20 Points)</h2>
-
-<h3>
-    Experiment with some the parameters in the simulation. To do so, pause the simulation at the start with <kbd>P</kbd>, modify the values of interest, and then resume by pressing
-    <kbd>P</kbd> again. You can also restart the simulation at any time from the cloth's starting position by pressing <kbd>R</kbd>.
-</h3>
-
-<small>
-        Describe the effects of changing the spring constant <code>ks</code>; how does the cloth behave from start to rest with a very low <code>ks</code>?
-        A high <code>ks</code>?
-</small>
-<p> Changing the spring constant ks will essentially affect how flexible or stiff the cloth will be. At a very low ks, we see a lot of ripple within the cloth and high degree of flexibility.
-    At a high ks, we see that the cloth is very stiff, with much fewer creases and flexibility </p>
-
-<small>
-    What about for <code>density</code>?
-</small>
-
-<p>The density will affect the mass per unit area of the cloth. It determines how much the cloth reacts to different forces. At a low density, the cloth would fall a bit slower and is more sensitive. At a high density, the cloth falls quicker as it is seemingly heavier. The force of gravity pulls the cloth down at a greater force.
-</p>
-<small>
-    What about for <code>damping</code>?-->
-</small>
-
-<p> Damping tells us the amount of resistance the cloth offers for motion. Having a higher percentage of damping means that the cloth is affected by motion less, the cloth falls slower. While having a lower percentage of damping makes it fall much faster.</p>
-
-<small>
-    Experiment with some the parameters in the simulation. To do so, pause the simulation at the start with <kbd>P</kbd>, modify the values of interest, and then resume by pressing
-    <kbd>P</kbd> again. You can also restart the simulation at any time from the cloth's starting position by pressing <kbd>R</kbd>.
-</small>
-<p> </p>
-<p> </p>
 <div align="middle">
     <table style="width:100%">
         <tr align="center">
             <td>
-                <img src="images/lowks.png" align="middle" width="450" />
-                <figcaption>pinned2 with a low ks value (ks = 1)</figcaption>
+                <img src="images/wallenewamerican.png" align="middle" width="300vw" />
+                <figcaption>New American Style Wall-E</figcaption>
             </td>
             <td>
-                <img src="images/highks.png" align="middle" width="450" />
-                <figcaption>pinned2 with a high ks value (ks = 50000)</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/lowdensity.png" align="middle" width="450" />
-                <figcaption>pinned2 with a low density (density = 1)</figcaption>
+                <img src="images/rabbitoftheeast.png" align="middle" width="300vw" />
+                <figcaption>New American Style bunny</figcaption>
             </td>
             <td>
-                <img src="images/highdensity.png" align="middle" width="450" />
-                <figcaption>pinned2 with a high density (density = 100)</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/lowdamping.png" align="middle" width="450" />
-                <figcaption>pinned2 with a low damping value (damping = .069)</figcaption>
-            </td>
-            <td>
-                <img src="images/highdamping.png" align="middle" width="450" />
-                <figcaption>pinned2 with a high damping value (damping = .839)</figcaption>
+                <img src="images/stoicpeter.png" align="middle" width="300vw" />
+                <figcaption>Peter with blue-purple-yellow palette. </figcaption>
             </td>
         </tr>
     </table>
 </div>
-
-<p>Show us a screenshot of your shaded cloth from scene/pinned4.json in its final resting state! If you choose to use different parameters than the default ones, please list them.</p>
-
 <div align="middle">
     <table style="width:100%">
         <tr align="center">
             <td>
-                <img src="images/pinned4normal.png" align="middle" width="450vw" />
-                <figcaption>pinned4 with normal shading. </figcaption>
+                <img src="images/chromebunny.png" align="middle" width="400vw" />
+                <figcaption>Chrome style bunny</figcaption>
             </td>
             <td>
-                <img src="images/pinned4wire.png" align="middle" width="450vw" />
-                <figcaption>pinned4 with wireframe. </figcaption>
+                <img src="images/chromedragon.png" align="middle" width="400vw" />
+                <figcaption>Chrome style dragon</figcaption>
             </td>
         </tr>
     </table>
 </div>
 
-<h2 align="middle">Part 3: Handling collisions with other objects (20 Points)</h2>
-
-<h3>Show us screenshots of your shaded cloth from scene/sphere.json in its final resting state on the sphere using the default ks = 5000 as well
-    as with ks = 500 and ks = 50000. Describe the differences in the results.</h3>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/spherek=500.png" align="middle" width="500vw" />
-                <figcaption>Cloth on sphere with ks = 500.</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/spherek=5000.png" align="middle" width="500vw" />
-                <figcaption>Cloth on sphere with ks = 5000.</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/spherek=50000.png" align="middle" width="500vw" />
-                <figcaption>Cloth on sphere with ks = 50000.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-<p>We can see as our ks value increases, our cloth seems to almost "open up". At ks = 500, the cloth seems to hang
-    a little lower, and it really clings to the sphere. At ks = 50000, the cloth opens up, and it seems to
-    almost parachute over the sphere. This makes sense, since a larger ks means stiffer springs, and the cloth would
-    therefore look stiffer. The opposite holds as well, a smaller ks means a more flexible cloth that is able to
-    closely drape itself over the sphere. </p>
-
-<h3>Show us a screenshot of your shaded cloth lying peacefully at rest on the plane. If you haven't by now, feel free to express your colorful creativity with the cloth!
-    (You will need to complete the shaders portion first to show custom colors.)</h3>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/greencheese.png" align="middle" width="500px" />
-                <figcaption>Cloth resting on plane.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-<h2 align="middle">Part 4: Handling self-collisions (20 Points)</h2>
-
-<h3>Show us at least 3 screenshots that document how your cloth falls and folds on itself, starting with an early, initial
-    self-collision and ending with the cloth at a more restful state (even if it is still slightly bouncy on the ground).</h3>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/earlyfall.png" align="middle" width="333vw" />
-                <figcaption>Cloth with an early self-collision.</figcaption>
-            </td>
-            <td>
-                <img src="images/midfall.png" align="middle" width="333vw" />
-                <figcaption>Cloth with a self-collision midfall.</figcaption>
-            </td>
-            <td>
-                <img src="images/finalrest.png" align="middle" width="333vw" />
-                <figcaption>Cloth resting after falling.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-<h3>Vary the density as well as ks and describe with words and screenshots how they affect the behavior of the cloth as it falls on itself.</h3>
-
-<p> With a lower density, our cloth folds in itself fairly easily. From the early fall, we see that the moment the cloth touches the plane,
-the whole cloth begins to fold, and the simulation shows it falling almost gracefully as it floats down to its final resting point.
-    With a higher density, the cloth is really resistant to folds in the early fall, as we can see the top of the cloth remains fairly flat and the folds are mild.
-    At its final resting state, though, the cloth flattens and folds tightly.
-</p>
-
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/falllowd.png" align="middle" width="450vw" />
-                <figcaption>Cloth in early fall with a low density</figcaption>
-            </td>
-            <td>
-                <img src="images/fallhighd.png" align="middle" width="450vw" />
-                <figcaption>Cloth in early fall with a high density.</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/restlowd.png" align="middle" width="450vw" />
-                <figcaption>Cloth at final rest with a low density</figcaption>
-            </td>
-            <td>
-                <img src="images/resthighd.png" align="middle" width="450vw" />
-                <figcaption>Cloth at final rest with a high density.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-<p>With greater Ks, the cloth seemingly stays extremely rigid and tries to maintain its shape as it falls since
-    the stiffness makes it harder to bend and form. The lower Ks has an opposite effect as
-    it becomes extremely flexible and sensitive, creating more folds quicker.</p>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/falllowks.png" align="middle" width="450vw" />
-                <figcaption>Cloth in early fall with a low ks value</figcaption>
-            </td>
-            <td>
-                <img src="images/fallhighks.png" align="middle" width="450vw" />
-                <figcaption>Cloth in early fall with a high ks value.</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/restlowks.png" align="middle" width="450vw" />
-                <figcaption>Cloth at final rest with a low ks value</figcaption>
-            </td>
-            <td>
-                <img src="images/resthighks.png" align="middle" width="450vw" />
-                <figcaption>Cloth at final rest with a high ks value.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-<h2 align="middle">Part 5: Cloth Sim (20 Points)</h2>
-
-<h3>Explain in your own words what is a shader program and how vertex and fragment shaders work together to create lighting and material effects.</h3>
-
-<p> A shader program is essentially a program that helps create realistic lighting and materials on 3D objects. Vertex shaders process the geometry
-    of the 3D objects, which includes position, rotations, scaling, and texture coordinate mapping. Fragment shaders help generate effects
-    such as color and lighting at the pixel. They work together to create lighting and material effects on 3D objects in time. </p>
-
-<h3>Explain the Blinn-Phong shading model in your own words. Show a screenshot of your Blinn-Phong shader outputting only the ambient component,
-    a screen shot only outputting the diffuse component, a screen shot only outputting
-    the specular component, and one using the entire Blinn-Phong model.</h3>
-
-<p> Blinn Phong shading works by calculating the reflection of a light source on a surface, and calculating how much of that reflection is visible to the viewer. The amount of reflection is also determined by the angle of the light coming in and the angle of the viewer to the surface. To do this we have to calculate the ambient light, the diffuse light, and the specular light. We then add these three terms together to obtain the final color and lighting of the pixel.
-</p>
-
-<h3>Show a screenshot of your texture mapping shader using your own custom texture by modifying the textures in <i>/textures/</i>.</h3>
-
-<p> TODO </p>
-
-<h3>Show a screenshot of bump mapping on the cloth and on the sphere. Show a screenshot of displacement mapping on the sphere. Use the same texture for
-    both renders. You can either provide your own texture or use one of the ones in the textures directory, BUT choose one that's not the default texture_2.png.
-    Compare the two approaches and resulting renders in your own words. Compare how your two shaders react to the sphere by changing the sphere mesh's
-    coarseness by using -o 16 -a 16 and then -o 128 -a 128. </h3>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/bump16.png" align="middle" width="450px" />
-                <figcaption>Bump mapping on cloth on sphere with sphere mesh coarseness of 16px</figcaption>
-            </td>
-            <td>
-                <img src="images/bump128.png" align="middle" width="450px" />
-                <figcaption>Bump mapping on cloth on sphere with sphere mesh coarseness of 128px</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/displacement16.png" align="middle" width="450px" />
-                <figcaption>Displacement mapping on cloth on sphere with sphere mesh coarseness of 16px</figcaption>
-            </td>
-            <td>
-                <img src="images/displacement128.png" align="middle" width="450px" />
-                <figcaption>Displacement mapping on cloth on sphere with sphere mesh coarseness of 128px</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-<p>
-    The differences between our bump and displacement mappings are subtle, but noticeable upon taking a closer look. Our bump mapping
-    shows the texture that we're putting on, yet the cloth and sphere are still smooth. Displacement is able to simulate how the texture
-    that we're place will affect the surface of our sphere and cloth. We can see that the displacement mapping looks bumpy where the cloth
-    touches the sphere, while the bump mapping is smooth.
-</p>
-
-<div>
-    <table>
-        <tr align="center">
-            <td>
-                <img src="images/separateb16.png" align="middle" width="450px" />
-                <figcaption>Bump mapping on cloth and sphere separate with sphere mesh coarseness of 16px</figcaption>
-            </td>
-            <td>
-                <img src="images/separateb128.png" align="middle" width="450px" />
-                <figcaption>Bump mapping on cloth and sphere separate with sphere mesh coarseness of 128px</figcaption>
-            </td>
-        </tr>
-        <tr align="center">
-            <td>
-                <img src="images/separated16.png" align="middle" width="450px" />
-                <figcaption>Displacement mapping on cloth and sphere separate with sphere mesh coarseness of 16px</figcaption>
-            </td>
-            <td>
-                <img src="images/separated128.png" align="middle" width="450px" />
-                <figcaption>Displacement mapping on cloth and sphere separate with sphere mesh coarseness of 128px</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-<p>
-    As for how the shaders react to the sphere mesh's coarseness, it's much more noticeable with the displacement shader. The bumps created
-    by the texture are smoother and more prominent with a higher coarseness, which makes sense since a higher coarseness seems to correlate with more flexibility.
-    The bump shader doesn't seem to change much between different coarseness levels.
-</p>
-
-<h3>Show a screenshot of your mirror shader on the cloth and on the sphere.</h3>
-
-<div align="middle">
-    <table style="width:100%">
-        <tr align="center">
-            <td>
-                <img src="images/mirror.png" align="middle" width="450px" />
-                <figcaption>Mirror shader on cloth on sphere.</figcaption>
-            </td>
-            <td>
-                <img src="images/mirrorandball.png" align="middle" width="450px" />
-                <figcaption>Mirror shader on cloth and sphere separate.</figcaption>
-            </td>
-        </tr>
-    </table>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
+<h2 align="middle">References</h2>
+<ul>
+    <li>
+        <a href="https://viterbi-web.usc.edu/~jbarbic/cs420-s22/24-npr/24-npr.pdf">Deck that goes through types of NPR</a>
+    </li>
+    <li><a href="https://www.researchgate.net/publication/236973460_Non-Photorealistic_Rendering">Paper that describes how to achieve various NPR techniques</a></li>
+    <li>
+        <a href="https://homepages.inf.ed.ac.uk/rbf/HIPR2/sobel.htm">Sobel Edge Detector</a>
+    </li>
+</ul>
+<h2 align="middle">Contributions from each team member</h2>
+<ul>
+    <li>
+        Jojo Chen: Implemented the stick and poke section and attempted to help debug the outline. 
+    </li>
+    <li>
+        Michelle Chen: Helped debug the outline approach and create different palettes for the American Traditional style.
+    </li>
+    <li>
+        Isabelle Liu: Researched and helped implement the outline approach. 
+    </li>
+    <li>
+        Nicholas Cheng: Researched and helped implement the American traditional style. Helped debug the outline approach as well. 
+    </li>
+</ul>
+<p>Overall, all of our members worked together and in sync throughout the entire project timeline! We are very happy with each other and our final project :)</p>
+<p>Special thanks to TA Catherine Gai for looking over our checkpoint and proposal!</p>
 
